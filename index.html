@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DAO Proposal Translator</title>
+    <style>
+      :root { color-scheme: light; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      body { margin: 0; background: #f8fafc; color: #0f172a; }
+      .page { max-width: 1080px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+      .hero { padding: 1.6rem; border-radius: 24px; background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%); border: 1px solid #dbeafe; }
+      .hero h1 { margin: 0.2rem 0 0.55rem; font-size: 2rem; }
+      .hero p { margin: 0; color: #475569; max-width: 760px; }
+      .panel { margin-top: 1rem; padding: 1.2rem; background: white; border: 1px solid #d7dce5; border-radius: 16px; }
+      .input-row { display: grid; gap: 0.75rem; }
+      input, textarea { width: 100%; border-radius: 12px; border: 1px solid #cbd5e1; padding: 0.85rem; font-size: 0.95rem; box-sizing: border-box; }
+      textarea { min-height: 240px; resize: vertical; }
+      .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.9rem; }
+      button { border: none; border-radius: 999px; padding: 0.8rem 1.2rem; font-weight: 700; cursor: pointer; }
+      .primary { background: #2563eb; color: white; }
+      .secondary { background: white; color: #0f172a; border: 1px solid #cbd5e1; }
+      .example-list { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-top: 0.8rem; }
+      .chip { border: 1px solid #cbd5e1; border-radius: 999px; padding: 0.45rem 0.7rem; background: #f8fafc; cursor: pointer; font-size: 0.9rem; }
+      .results { display: grid; gap: 1rem; margin-top: 1.2rem; }
+      .card { padding: 1rem 1.15rem; border-radius: 16px; border: 1px solid #d7dce5; background: white; }
+      .eyebrow { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #4f46e5; margin-bottom: 0.3rem; }
+      .pill { display: inline-block; padding: 0.35rem 0.6rem; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: 0.82rem; margin-right: 0.4rem; margin-top: 0.4rem; }
+      ul { padding-left: 1.1rem; margin: 0.3rem 0 0; }
+      li { margin-bottom: 0.4rem; }
+      .muted { color: #475569; }
+      @media (max-width: 780px) { .page { padding: 1rem 0.8rem 2rem; } .hero h1 { font-size: 1.6rem; } }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <p class="eyebrow">DAO Proposal Translator</p>
+        <h1>Turn governance text into a fast, readable decision summary.</h1>
+        <p>Paste a proposal draft, add a source link, and get a plain-English summary, a risk profile, and a simple vote recommendation in seconds.</p>
+      </section>
+
+      <section class="panel">
+        <div class="input-row">
+          <label for="proposal-url" style="display:block; font-weight:600;">Proposal source</label>
+          <input id="proposal-url" placeholder="https://snapshot.org/#/example/proposal/123" />
+          <label for="proposal-text" style="display:block; font-weight:600;">Proposal text</label>
+          <textarea id="proposal-text"></textarea>
+        </div>
+
+        <div class="example-list" id="example-list"></div>
+
+        <div class="actions">
+          <button class="primary" onclick="analyzeProposal()">Analyze proposal</button>
+          <button class="secondary" onclick="loadSample()">Load sample</button>
+          <button class="secondary" onclick="copyResults()">Copy results</button>
+        </div>
+      </section>
+
+      <section id="results" class="results"></section>
+    </main>
+
+    <script>
+      const sampleProposals = {
+        treasury: {
+          title: 'Treasury and Operations Proposal',
+          text: 'Proposal: Allocate 250,000 USDC from the treasury to fund a new AI governance assistant and expand grant operations. The proposal also adds a new multisig signer and changes voting thresholds.'
+        },
+        community: {
+          title: 'Community Growth Proposal',
+          text: 'Proposal: Launch a new onboarding campaign for DAO members with a modest budget and clear milestones. The proposal aims to improve education, onboarding, and participation across the community.'
+        },
+        governance: {
+          title: 'Governance Upgrade Proposal',
+          text: 'Proposal: Increase the quorum threshold for future governance votes and require a longer discussion period for large treasury actions. The goal is to improve participation quality and reduce rushed decisions.'
+        }
+      };
+
+      const proposalText = document.getElementById('proposal-text');
+      const proposalUrl = document.getElementById('proposal-url');
+      const exampleList = document.getElementById('example-list');
+
+      function populateExamples() {
+        exampleList.innerHTML = '';
+        Object.entries(sampleProposals).forEach(([key, value]) => {
+          const chip = document.createElement('button');
+          chip.className = 'chip';
+          chip.type = 'button';
+          chip.textContent = value.title;
+          chip.onclick = () => loadExample(key);
+          exampleList.appendChild(chip);
+        });
+      }
+
+      function loadExample(key) {
+        const sample = sampleProposals[key];
+        proposalText.value = sample.text;
+        proposalUrl.value = `https://example.org/proposals/${key}`;
+        analyzeProposal();
+      }
+
+      function analyzeProposal() {
+        const text = proposalText.value.trim();
+        const source = proposalUrl.value.trim();
+        const lower = text.toLowerCase();
+        const hasTreasury = lower.includes('treasury') || lower.includes('budget') || lower.includes('fund');
+        const hasMultisig = lower.includes('multisig') || lower.includes('signer');
+        const hasGovernanceChange = lower.includes('voting') || lower.includes('threshold') || lower.includes('governance');
+        const hasCommunity = lower.includes('community') || lower.includes('members') || lower.includes('onboarding');
+        const hasQuorum = lower.includes('quorum');
+
+        let title = 'DAO Proposal Insight';
+        let summary = 'This proposal appears to be a governance or community initiative.';
+        let riskLevel = 'Low';
+        const risks = [];
+        const impact = [];
+        const tags = [];
+
+        if (hasTreasury) {
+          title = 'Treasury and Operations Proposal';
+          summary = 'The proposal requests funding or treasury allocation and should be reviewed closely.';
+          riskLevel = 'Medium';
+          risks.push('Treasury spending could impact liquidity and reserve capacity.');
+          tags.push('Treasury');
+        }
+
+        if (hasMultisig) {
+          riskLevel = 'High';
+          risks.push('New signer or multisig changes may increase custody risk.');
+          tags.push('Security');
+        }
+
+        if (hasGovernanceChange || hasQuorum) {
+          risks.push('Governance threshold changes may affect decision-making power.');
+          tags.push('Governance');
+        }
+
+        if (hasCommunity) {
+          impact.push('The proposal may improve community engagement and onboarding.');
+          tags.push('Community');
+        }
+
+        if (!risks.length) {
+          risks.push('No major risks were detected from the provided text.');
+        }
+
+        if (!impact.length) {
+          impact.push('The proposal may have a modest effect on DAO operations.');
+        }
+
+        const recommendation = riskLevel === 'High'
+          ? 'Caution: review the proposal carefully before voting.'
+          : hasCommunity
+            ? 'Support: the proposal appears to strengthen community engagement.'
+            : 'Caution: the proposal needs closer review before supporting.';
+
+        const formattedTags = tags.length ? tags.map((tag) => `<span class="pill">${tag}</span>`).join('') : '<span class="pill">General</span>';
+
+        document.getElementById('results').innerHTML = `
+          <div class="card">
+            <div class="eyebrow">${title}</div>
+            <h2 style="margin:0.25rem 0;">${summary}</h2>
+            <p class="muted" style="margin:0.25rem 0 0;">Source: ${source || 'No source provided'}</p>
+            <div style="margin-top:0.55rem;">${formattedTags}</div>
+            <p style="margin:0.6rem 0 0; color:#475569;">Risk level: <strong>${riskLevel}</strong></p>
+          </div>
+          <div class="card">
+            <h3 style="margin-top:0;">Plain-English summary</h3>
+            <p style="margin:0; color:#334155;">${summary}</p>
+          </div>
+          <div class="card">
+            <h3 style="margin-top:0;">Why this matters</h3>
+            <ul>${impact.map((item) => `<li>${item}</li>`).join('')}</ul>
+          </div>
+          <div class="card">
+            <h3 style="margin-top:0;">Key risks</h3>
+            <ul>${risks.map((item) => `<li>${item}</li>`).join('')}</ul>
+          </div>
+          <div class="card">
+            <h3 style="margin-top:0;">Suggested vote</h3>
+            <p style="margin:0;">${recommendation}</p>
+          </div>
+        `;
+      }
+
+      function loadSample() {
+        proposalText.value = sampleProposals.treasury.text;
+        proposalUrl.value = 'https://example.org/proposals/treasury';
+        analyzeProposal();
+      }
+
+      async function copyResults() {
+        const content = document.getElementById('results').innerText;
+        try {
+          await navigator.clipboard.writeText(content);
+          alert('Analysis copied to clipboard.');
+        } catch (error) {
+          alert('Copy failed, but the analysis is visible on screen.');
+        }
+      }
+
+      populateExamples();
+      loadSample();
+    </script>
+  </body>
+</html>
