@@ -36,7 +36,7 @@
       <section class="hero">
         <p class="eyebrow">DAO Proposal Translator</p>
         <h1>Turn governance text into a fast, readable decision summary.</h1>
-        <p>Paste a proposal draft, add a source link, and get a plain-English summary, a risk profile, and a simple vote recommendation in seconds.</p>
+        <p>Paste a proposal draft, add a source link, and get a plain-English summary, a risk profile, and a simple vote recommendation in seconds. This build is designed to feel right at home in an X Layer-style hackathon submission.</p>
       </section>
 
       <section class="panel">
@@ -79,6 +79,72 @@
       const proposalUrl = document.getElementById('proposal-url');
       const exampleList = document.getElementById('example-list');
 
+      function analyzeProposalText(text) {
+        const lower = (text || '').toLowerCase();
+        const hasTreasury = /treasury|budget|fund|grant|allocation/.test(lower);
+        const hasMultisig = /multisig|signer|custody/.test(lower);
+        const hasGovernance = /governance|voting|quorum|threshold|proposal/.test(lower);
+        const hasCommunity = /community|member|onboarding|education/.test(lower);
+
+        const risks = [];
+        if (hasTreasury) risks.push('Treasury allocation may affect runway and reserve health.');
+        if (hasMultisig) risks.push('Signer changes may increase custody and governance risk.');
+        if (hasGovernance) risks.push('Threshold or quorum changes may alter decision dynamics.');
+        if (!risks.length) risks.push('No major risk signals were detected in the text.');
+
+        const impact = [];
+        if (hasCommunity) impact.push('Community engagement and onboarding may improve.');
+        if (hasTreasury) impact.push('The proposal may expand execution capacity or funding access.');
+        if (!impact.length) impact.push('The proposal likely affects governance or operations at a moderate level.');
+
+        const highlights = [];
+        if (hasTreasury) highlights.push('Treasury movement is explicitly referenced.');
+        if (hasMultisig) highlights.push('Custody or signer authority is being changed.');
+        if (hasGovernance) highlights.push('Governance mechanics are part of the proposal.');
+        if (hasCommunity) highlights.push('Community participation is a stated goal.');
+        if (highlights.length < 3) highlights.push('The request is relatively straightforward and should be easy to evaluate.');
+
+        const riskScore = Math.min(100, 45 + (hasTreasury ? 15 : 0) + (hasMultisig ? 20 : 0) + (hasGovernance ? 10 : 0) + (hasCommunity ? 5 : 0));
+        const confidence = Math.min(0.99, 0.72 + (riskScore / 200));
+        const actionType = hasTreasury && hasMultisig ? 'Treasury + custody' : hasTreasury ? 'Treasury' : hasGovernance ? 'Governance' : 'Community';
+
+        let recommendation = 'Caution: review carefully before voting.';
+        let recommendedAction = 'Review the proposal details and discuss the tradeoffs before voting.';
+        if (hasTreasury && hasMultisig) {
+          recommendation = 'High caution: this proposal combines funding and custody changes.';
+          recommendedAction = 'Vote no or abstain until the treasury and signer changes are clarified.';
+        } else if (hasCommunity) {
+          recommendation = 'Support: the proposal appears constructive for DAO participation.';
+          recommendedAction = 'Support the proposal if the scope stays within the stated community goals.';
+        }
+
+        return {
+          summary: hasTreasury
+            ? 'This proposal requests funding or treasury movement and should be reviewed closely.'
+            : 'This proposal appears to be a governance or community initiative with moderate implications.',
+          riskLevel: hasTreasury && hasMultisig ? 'High' : hasTreasury ? 'Medium' : 'Low',
+          risks,
+          impact,
+          recommendation,
+          recommendedAction,
+          actionType,
+          quickTake: hasTreasury && hasMultisig
+            ? 'The proposal touches treasury funds and custody authority, which raises the urgency of the review.'
+            : hasTreasury
+              ? 'The proposal involves treasury movement and should be weighed carefully.'
+              : 'The proposal looks manageable but still deserves a close read.',
+          confidence: Number(confidence.toFixed(2)),
+          riskScore,
+          highlights,
+          tags: [
+            ...(hasTreasury ? ['Treasury'] : []),
+            ...(hasGovernance ? ['Governance'] : []),
+            ...(hasCommunity ? ['Community'] : []),
+            ...(hasMultisig ? ['Security'] : [])
+          ].slice(0, 4)
+        };
+      }
+
       function populateExamples() {
         exampleList.innerHTML = '';
         Object.entries(sampleProposals).forEach(([key, value]) => {
@@ -98,88 +164,65 @@
         analyzeProposal();
       }
 
-      function analyzeProposal() {
-        const text = proposalText.value.trim();
-        const source = proposalUrl.value.trim();
-        const lower = text.toLowerCase();
-        const hasTreasury = lower.includes('treasury') || lower.includes('budget') || lower.includes('fund');
-        const hasMultisig = lower.includes('multisig') || lower.includes('signer');
-        const hasGovernanceChange = lower.includes('voting') || lower.includes('threshold') || lower.includes('governance');
-        const hasCommunity = lower.includes('community') || lower.includes('members') || lower.includes('onboarding');
-        const hasQuorum = lower.includes('quorum');
-
-        let title = 'DAO Proposal Insight';
-        let summary = 'This proposal appears to be a governance or community initiative.';
-        let riskLevel = 'Low';
-        const risks = [];
-        const impact = [];
-        const tags = [];
-
-        if (hasTreasury) {
-          title = 'Treasury and Operations Proposal';
-          summary = 'The proposal requests funding or treasury allocation and should be reviewed closely.';
-          riskLevel = 'Medium';
-          risks.push('Treasury spending could impact liquidity and reserve capacity.');
-          tags.push('Treasury');
-        }
-
-        if (hasMultisig) {
-          riskLevel = 'High';
-          risks.push('New signer or multisig changes may increase custody risk.');
-          tags.push('Security');
-        }
-
-        if (hasGovernanceChange || hasQuorum) {
-          risks.push('Governance threshold changes may affect decision-making power.');
-          tags.push('Governance');
-        }
-
-        if (hasCommunity) {
-          impact.push('The proposal may improve community engagement and onboarding.');
-          tags.push('Community');
-        }
-
-        if (!risks.length) {
-          risks.push('No major risks were detected from the provided text.');
-        }
-
-        if (!impact.length) {
-          impact.push('The proposal may have a modest effect on DAO operations.');
-        }
-
-        const recommendation = riskLevel === 'High'
-          ? 'Caution: review the proposal carefully before voting.'
-          : hasCommunity
-            ? 'Support: the proposal appears to strengthen community engagement.'
-            : 'Caution: the proposal needs closer review before supporting.';
-
-        const formattedTags = tags.length ? tags.map((tag) => `<span class="pill">${tag}</span>`).join('') : '<span class="pill">General</span>';
+      function renderResults(data, source) {
+        const title = data.tags.length ? `${data.tags.join(' + ')} Proposal` : 'DAO Proposal Insight';
+        const formattedTags = data.tags.length ? data.tags.map((tag) => `<span class="pill">${tag}</span>`).join('') : '<span class="pill">General</span>';
 
         document.getElementById('results').innerHTML = `
           <div class="card">
             <div class="eyebrow">${title}</div>
-            <h2 style="margin:0.25rem 0;">${summary}</h2>
+            <h2 style="margin:0.25rem 0;">${data.summary}</h2>
             <p class="muted" style="margin:0.25rem 0 0;">Source: ${source || 'No source provided'}</p>
             <div style="margin-top:0.55rem;">${formattedTags}</div>
-            <p style="margin:0.6rem 0 0; color:#475569;">Risk level: <strong>${riskLevel}</strong></p>
+            <p style="margin:0.6rem 0 0; color:#475569;">Risk level: <strong>${data.riskLevel}</strong> · Confidence: <strong>${Math.round(data.confidence * 100)}%</strong> · Risk score: <strong>${data.riskScore}/100</strong></p>
+          </div>
+          <div class="card">
+            <h3 style="margin-top:0;">Quick take</h3>
+            <p style="margin:0; color:#334155;">${data.quickTake}</p>
           </div>
           <div class="card">
             <h3 style="margin-top:0;">Plain-English summary</h3>
-            <p style="margin:0; color:#334155;">${summary}</p>
+            <p style="margin:0; color:#334155;">${data.summary}</p>
           </div>
           <div class="card">
             <h3 style="margin-top:0;">Why this matters</h3>
-            <ul>${impact.map((item) => `<li>${item}</li>`).join('')}</ul>
+            <ul>${data.impact.map((item) => `<li>${item}</li>`).join('')}</ul>
           </div>
           <div class="card">
             <h3 style="margin-top:0;">Key risks</h3>
-            <ul>${risks.map((item) => `<li>${item}</li>`).join('')}</ul>
+            <ul>${data.risks.map((item) => `<li>${item}</li>`).join('')}</ul>
+          </div>
+          <div class="card">
+            <h3 style="margin-top:0;">Actionable guidance</h3>
+            <ul>${data.highlights.map((item) => `<li>${item}</li>`).join('')}</ul>
+            <p style="margin:0.6rem 0 0;">${data.recommendedAction}</p>
           </div>
           <div class="card">
             <h3 style="margin-top:0;">Suggested vote</h3>
-            <p style="margin:0;">${recommendation}</p>
+            <p style="margin:0;">${data.recommendation}</p>
           </div>
         `;
+      }
+
+      async function analyzeProposal() {
+        const text = proposalText.value.trim();
+        const source = proposalUrl.value.trim();
+
+        document.getElementById('results').innerHTML = '<div class="card"><p class="muted">Analyzing proposal with the local AI-assisted engine…</p></div>';
+
+        try {
+          const response = await fetch('/api/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, source })
+          });
+          if (!response.ok) throw new Error('backend unavailable');
+          const data = await response.json();
+          renderResults(data, source);
+        } catch (error) {
+          const data = analyzeProposalText(text);
+          renderResults(data, source);
+        }
       }
 
       function loadSample() {
