@@ -4,6 +4,7 @@
   "private": true,
   "description": "AI-assisted DAO proposal translator demo with a lightweight backend",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test tests/server.test.js"
   }
 }
